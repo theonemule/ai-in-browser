@@ -1,4 +1,4 @@
-#AI in the Browser
+# AI in the Browser
 
 The demos here showcase various applications of AI and machine learning technologies, including real-time audio transcription, object detection, face landmark detection, question-answering, text summarization, image captioning, sentiment analysis, and toxicity analysis. These demos utilize different models and libraries such as the Web Speech API, TensorFlow.js, and Transformers.js to provide interactive and practical examples of AI capabilities completely within the context of a browser.
 
