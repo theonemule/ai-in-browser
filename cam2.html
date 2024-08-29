@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Googly Eyes and Rotating Wax Lips with Face Landmarks</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            height: 100vh;
+            margin: 0;
+        }
+        video, canvas {
+            margin: 10px;
+            width: 640px;
+            height: 480px;
+            border: 1px solid #ccc;
+        }
+		
+    </style>
+</head>
+<body>
+
+
+    <video id="webcam" autoplay playsinline width="640" height="480"></video>
+    <canvas id="canvas-dots" width="640" height="480"></canvas>
+    <canvas id="canvas-overlays" width="640" height="480"></canvas>
+    <!-- Load your googly eye and wax lips images here -->
+    <img id="googly-eye" src="eye.png" alt="Googly Eye" style="display:none;">
+    <img id="wax-lips" src="lips.png" alt="Wax Lips" style="display:none;">
+    <script>
+        async function setupWebcam() {
+            return new Promise((resolve, reject) => {
+                const webcamElement = document.getElementById('webcam');
+                navigator.mediaDevices.getUserMedia({
+					video:true
+                    /*video: {
+                        width: 640,
+                        height: 480
+                    }*/
+                }).then(stream => {
+                    webcamElement.srcObject = stream;
+                    webcamElement.addEventListener('loadeddata', () => resolve(webcamElement));
+                }).catch(reject);
+            });
+        }
+
+        async function detectFaceLandmarks() {
+            const model = await faceLandmarksDetection.createDetector(
+                faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh, 
+                {
+                    runtime: 'tfjs',
+                    maxFaces: 1
+                }
+            );
+
+            const webcamElement = await setupWebcam();
+            const canvasDots = document.getElementById('canvas-dots');
+            const canvasOverlays = document.getElementById('canvas-overlays');
+            const ctxDots = canvasDots.getContext('2d');
+            const ctxOverlays = canvasOverlays.getContext('2d');
+            const googlyEyeImage = document.getElementById('googly-eye');
+            const waxLipsImage = document.getElementById('wax-lips');
+
+            async function renderPrediction() {
+                const predictions = await model.estimateFaces(webcamElement);
+
+                // Clear both canvases
+                ctxDots.clearRect(0, 0, canvasDots.width, canvasDots.height);
+                ctxOverlays.clearRect(0, 0, canvasOverlays.width, canvasOverlays.height);
+
+                // Draw video frame to both canvases
+                ctxDots.drawImage(webcamElement, 0, 0, canvasDots.width, canvasDots.height);
+                ctxOverlays.drawImage(webcamElement, 0, 0, canvasOverlays.width, canvasOverlays.height);
+
+                if (predictions.length > 0) {
+                    predictions.forEach(prediction => {
+                        const keypoints = prediction.keypoints;
+
+                        // Draw mesh dots on the first canvas
+                        keypoints.forEach(keypoint => {
+                            const [x, y] = [keypoint.x, keypoint.y];
+
+                            ctxDots.beginPath();
+                            ctxDots.arc(x, y, 1, 0, 2 * Math.PI);
+                            ctxDots.fillStyle = 'red';
+                            ctxDots.fill();
+                        });
+
+                        // Identify keypoints for eyes and mouth
+                        const leftEyeCenter = keypoints[263]; // Approximate center of the left eye
+                        const rightEyeCenter = keypoints[33]; // Approximate center of the right eye
+                        const mouthLeft = keypoints[61]; // Left corner of the mouth
+                        const mouthRight = keypoints[291]; // Right corner of the mouth
+                        const mouthCenter = keypoints[13]; // Approximate center of the mouth
+
+                        // Calculate eye size based on distance between eye corners
+                        const eyeWidth = Math.abs(keypoints[133].x - keypoints[33].x) * 1.5; // Increase size for bigger eyes
+                        const eyeHeight = eyeWidth; // Keep the googly eyes square
+
+                        // Draw googly eyes on the second canvas
+                        ctxOverlays.drawImage(googlyEyeImage, leftEyeCenter.x - eyeWidth / 1.5, leftEyeCenter.y - eyeHeight / 2, eyeWidth, eyeHeight);
+                        ctxOverlays.drawImage(googlyEyeImage, rightEyeCenter.x - eyeWidth / 2.5, rightEyeCenter.y - eyeHeight / 2, eyeWidth, eyeHeight);
+
+                        // Calculate the angle of the mouth
+                        const angle = Math.atan2(mouthRight.y - mouthLeft.y, mouthRight.x - mouthLeft.x);
+
+                        // Calculate mouth size and position
+                        const mouthWidth = Math.abs(keypoints[308].x - keypoints[78].x) * 2; // Increase size for bigger lips
+                        const mouthHeight = mouthWidth / 1.5; // Adjust the aspect ratio
+                        const mouthX = mouthCenter.x;
+                        const mouthY = mouthCenter.y;
+
+                        // Rotate and draw wax lips on the second canvas
+                        ctxOverlays.save(); // Save the current state
+                        ctxOverlays.translate(mouthX, mouthY); // Translate to the mouth center
+                        ctxOverlays.rotate(angle); // Rotate by the calculated angle
+                        ctxOverlays.drawImage(waxLipsImage, -mouthWidth / 2, -mouthHeight / 2, mouthWidth, mouthHeight);
+                        ctxOverlays.restore(); // Restore the previous state
+                    });
+                }
+
+                requestAnimationFrame(renderPrediction);
+            }
+
+            renderPrediction();
+        }
+
+        detectFaceLandmarks();
+    </script>
+</body>
+</html>

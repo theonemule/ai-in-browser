@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text Summarization with BART</title>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 50px;
+    }
+    #inputText {
+      width: 500px;
+      max-width: 100%;
+      padding: 10px;
+      border: 1px solid black;
+      margin-bottom: 20px;
+    }
+    #output {
+      border: 1px solid black;
+      padding: 10px;
+      width: 500px;
+      max-width: 100%;
+      min-height: 50px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+  </style>
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+    // Since we will download the model from the Hugging Face Hub, we can skip the local model check
+    env.allowLocalModels = false;
+
+    // Reference the elements that we will need
+    const status = document.getElementById('status');
+    const inputText = document.getElementById('inputText');
+    const outputDiv = document.getElementById('output');
+    const processButton = document.getElementById('processButton');
+
+    // Load the text generation pipeline for summarization
+    status.textContent = 'Loading model...';
+	const summarizer = await pipeline('summarization', 'Xenova/distilbart-cnn-6-6');
+    status.textContent = 'Ready';
+
+    // Process text when button is clicked
+    processButton.addEventListener('click', async () => {
+      const text = inputText.value.trim();
+
+      if (!text) {
+        outputDiv.textContent = 'Please provide input text to summarize.';
+        return;
+      }
+
+      const taskText = `${text}`;
+
+      try {
+        status.textContent = 'Processing...';
+        const result = await summarizer(taskText, { max_new_tokens: 100 });
+        outputDiv.textContent = result[0].summary_text;
+      } catch (error) {
+        console.error('Error processing text:', error);
+        outputDiv.textContent = 'Error processing the text. Please try again.';
+      } finally {
+        status.textContent = 'Ready';
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Text Summarization with BART</h1>
+    <p id="status">Loading...</p>
+    <textarea id="inputText" rows="6" placeholder="Enter the input text here..."></textarea>
+    <button id="processButton">Summarize Text</button>
+    <div id="output">Output will appear here</div>
+  </div>
+</body>
+</html>

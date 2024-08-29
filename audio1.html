@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Audio Transcription</title>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 50px;
+    }
+    #transcript {
+      border: 1px solid black;
+      padding: 10px;
+      width: 500px;
+      max-width: 100%;
+      min-height: 150px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Real-Time Audio Transcription</h1>
+    <div id="transcript"></div>
+    <button id="startStopButton">Start Transcription</button>
+  </div>
+
+  <script>
+    const startStopButton = document.getElementById('startStopButton');
+    const transcriptDiv = document.getElementById('transcript');
+    let isTranscribing = false;
+    let recognition;
+
+    if ('webkitSpeechRecognition' in window) {
+      recognition = new webkitSpeechRecognition();
+    } else if ('SpeechRecognition' in window) {
+      recognition = new SpeechRecognition();
+    } else {
+      alert('Your browser does not support the Web Speech API. Please use Google Chrome or another compatible browser.');
+    }
+
+    if (recognition) {
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        transcriptDiv.innerHTML = `<strong>Final:</strong> ${finalTranscript}<br/><strong>Interim:</strong> ${interimTranscript}`;
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error', event);
+      };
+    }
+
+    startStopButton.addEventListener('click', () => {
+      if (isTranscribing) {
+        recognition.stop();
+        startStopButton.textContent = 'Start Transcription';
+      } else {
+        recognition.start();
+        startStopButton.textContent = 'Stop Transcription';
+      }
+      isTranscribing = !isTranscribing;
+    });
+  </script>
+</body>
+</html>

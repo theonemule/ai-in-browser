@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TensorFlow.js Image Processing</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .output {
+      margin-top: 20px;
+    }
+    #canvas {
+      border: 1px solid black;
+      max-width: 500px;
+      width: 100%;
+    }
+    img {
+      max-width: 500px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TensorFlow.js Image Processing</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+    <img id="image" style="display:none;">
+    <canvas id="canvas"></canvas>
+    <div id="results" class="output"></div>
+  </div>
+
+  <script>
+    document.getElementById('imageUpload').addEventListener('change', handleImageUpload);
+
+    async function handleImageUpload(event) {
+      const image = document.getElementById('image');
+      const canvas = document.getElementById('canvas');
+      const results = document.getElementById('results');
+      const file = event.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function() {
+        image.src = reader.result;
+        image.onload = async function() {
+          // Resize canvas to match image dimensions
+          const scale = image.width > 500 ? 500 / image.width : 1;
+          canvas.width = image.width * scale;
+          canvas.height = image.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          // Perform image classification
+          const mobilenetModel = await mobilenet.load();
+          const classification = await mobilenetModel.classify(image);
+          displayResults('Image Classification', classification);
+
+          // Perform object detection
+          const cocoSsdModel = await cocoSsd.load();
+          const detection = await cocoSsdModel.detect(image);
+          displayResults('Object Detection', detection);
+          drawBoxes(detection, ctx, scale);
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function displayResults(title, results) {
+      const resultsContainer = document.getElementById('results');
+      const section = document.createElement('div');
+      const heading = document.createElement('h2');
+      heading.textContent = title;
+      section.appendChild(heading);
+
+      if (Array.isArray(results)) {
+        results.forEach(result => {
+          const p = document.createElement('p');
+          p.textContent = JSON.stringify(result);
+          section.appendChild(p);
+        });
+      } else {
+        const p = document.createElement('p');
+        p.textContent = JSON.stringify(results);
+        section.appendChild(p);
+      }
+
+      resultsContainer.appendChild(section);
+    }
+
+    function drawBoxes(detections, ctx, scale) {
+      detections.forEach(item => {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(item.bbox[0] * scale, item.bbox[1] * scale, item.bbox[2] * scale, item.bbox[3] * scale);
+        ctx.font = '16px Arial';
+        ctx.fillStyle = 'red';
+        ctx.fillText(item.class, item.bbox[0] * scale, item.bbox[1] * scale > 10 ? item.bbox[1] * scale - 5 : 10);
+      });
+    }
+  </script>
+</body>
+</html>

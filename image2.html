@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Captioning with Transformers.js</title>
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('imageUpload').addEventListener('change', handleImageUpload);
+    });
+
+    async function handleImageUpload(event) {
+      const image = document.getElementById('image');
+      const canvas = document.getElementById('canvas');
+      const results = document.getElementById('results');
+      const file = event.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function() {
+        image.src = reader.result;
+        image.onload = async function() {
+          // Resize canvas to match image dimensions
+          const scale = image.width > 500 ? 500 / image.width : 1;
+          canvas.width = image.width * scale;
+          canvas.height = image.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          // Convert the canvas to a blob
+          canvas.toBlob(async (blob) => {
+            const blobUrl = URL.createObjectURL(blob);
+
+            try {
+              // Load the image captioning pipeline
+              const captioner = await pipeline('image-to-text', 'Xenova/vit-gpt2-image-captioning');
+
+              // Generate caption using the blob URL
+              const caption = await captioner(blobUrl);
+
+              displayResults('Image Captioning', caption);
+            } catch (error) {
+              displayError(error);
+            } finally {
+              // Revoke the blob URL to free memory
+              URL.revokeObjectURL(blobUrl);
+            }
+          }, 'image/png');
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function displayResults(title, results) {
+      const resultsContainer = document.getElementById('results');
+      resultsContainer.innerHTML = ''; // Clear previous results
+      const section = document.createElement('div');
+      const heading = document.createElement('h2');
+      heading.textContent = title;
+      section.appendChild(heading);
+
+      if (results.length > 0) {
+        results.forEach(result => {
+          const p = document.createElement('p');
+          p.textContent = result.generated_text;
+          section.appendChild(p);
+        });
+      } else {
+        const p = document.createElement('p');
+        p.textContent = 'No caption generated.';
+        section.appendChild(p);
+      }
+
+      resultsContainer.appendChild(section);
+    }
+
+    function displayError(error) {
+      const resultsContainer = document.getElementById('results');
+      resultsContainer.innerHTML = ''; // Clear previous results
+      const section = document.createElement('div');
+      const heading = document.createElement('h2');
+      heading.textContent = 'Error';
+      section.appendChild(heading);
+
+      const p = document.createElement('p');
+      p.textContent = `An error occurred: ${error.message}`;
+      section.appendChild(p);
+
+      resultsContainer.appendChild(section);
+    }
+  </script>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .output {
+      margin-top: 20px;
+    }
+    #canvas {
+      border: 1px solid black;
+      max-width: 500px;
+      width: 100%;
+    }
+    img {
+      max-width: 500px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Image Captioning with Transformers.js</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+    <img id="image" style="display:none;">
+    <canvas id="canvas"></canvas>
+    <div id="results" class="output"></div>
+  </div>
+</body>
+</html>

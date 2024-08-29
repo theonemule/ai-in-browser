@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speech to Text with Whisper</title>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 50px;
+    }
+    #transcription {
+      border: 1px solid black;
+      padding: 10px;
+      width: 500px;
+      max-width: 100%;
+      min-height: 50px;
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+  </style>
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+    // Disable local model loading since we'll use the Hugging Face Hub
+    env.allowLocalModels = false;
+
+    // Reference elements
+    const status = document.getElementById('status');
+    const transcriptionDiv = document.getElementById('transcription');
+    const recordButton = document.getElementById('recordButton');
+    const stopButton = document.getElementById('stopButton');
+
+    let recorder;
+    let audioChunks = [];
+
+    // Load the Whisper model for speech-to-text
+    status.textContent = 'Loading model...';
+    const whisper = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+    status.textContent = 'Ready';
+
+    recordButton.addEventListener('click', async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Your browser does not support audio recording.');
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recorder = new MediaRecorder(stream);
+
+        recorder.ondataavailable = event => {
+          audioChunks.push(event.data);
+        };
+
+        recorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          audioChunks = []; // Clear the chunks for the next recording
+
+          // Create a Blob URL
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          // Process audio with Whisper model using the Blob URL
+          status.textContent = 'Transcribing...';
+          const transcription = await whisper(audioUrl);
+          transcriptionDiv.textContent = transcription.text;
+          status.textContent = 'Ready';
+          stopButton.disabled = true; // Disable stop button after stopping
+
+          // Revoke the Blob URL to release memory
+          URL.revokeObjectURL(audioUrl);
+        };
+
+        recorder.start();
+        status.textContent = 'Recording...';
+        stopButton.disabled = false; // Enable stop button when recording starts
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+        status.textContent = 'Error: Unable to access microphone.';
+      }
+    });
+
+    stopButton.addEventListener('click', () => {
+      if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Speech to Text with Whisper</h1>
+    <p id="status">Loading...</p>
+    <button id="recordButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+    <div id="transcription">Transcription will appear here</div>
+  </div>
+</body>
+</html>

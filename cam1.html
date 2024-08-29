@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TensorFlow.js Real-Time Object Detection</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .output {
+      margin-top: 20px;
+    }
+    video, canvas {
+      max-width: 500px;
+      width: 100%;
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TensorFlow.js Real-Time Object Detection</h1>
+    <video id="webcam" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <div id="results" class="output"></div>
+  </div>
+
+  <script>
+    let video, canvas, ctx, cocoSsdModel;
+
+    async function setupWebcam() {
+      video = document.getElementById('webcam');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      return new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          resolve(video);
+        };
+      });
+    }
+
+    async function loadModel() {
+      cocoSsdModel = await cocoSsd.load();
+    }
+
+    async function detectFrame() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Resize canvas to match video dimensions
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Perform object detection
+        const detections = await cocoSsdModel.detect(video);
+        displayResults(detections);
+        drawBoxes(detections, ctx);
+
+        // Continue to detect frames
+        requestAnimationFrame(detectFrame);
+      }
+    }
+
+    function displayResults(results) {
+      const resultsContainer = document.getElementById('results');
+      resultsContainer.innerHTML = ''; // Clear previous results
+
+      results.forEach(result => {
+        const p = document.createElement('p');
+        p.textContent = JSON.stringify(result);
+        resultsContainer.appendChild(p);
+      });
+    }
+
+    function drawBoxes(detections, ctx) {
+      detections.forEach(item => {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(item.bbox[0], item.bbox[1], item.bbox[2], item.bbox[3]);
+        ctx.font = '16px Arial';
+        ctx.fillStyle = 'red';
+        ctx.fillText(item.class, item.bbox[0], item.bbox[1] > 10 ? item.bbox[1] - 5 : 10);
+      });
+    }
+
+    async function main() {
+      canvas = document.getElementById('canvas');
+      ctx = canvas.getContext('2d');
+      await setupWebcam();
+      await loadModel();
+      detectFrame();
+    }
+
+    main();
+  </script>
+</body>
+</html>

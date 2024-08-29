@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Toxicity Analysis</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/toxicity"></script>
+  <style>
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 50px;
+    }
+    #textInput {
+      width: 500px;
+      max-width: 100%;
+      padding: 10px;
+      border: 1px solid black;
+      margin-bottom: 20px;
+    }
+    #result {
+      border: 1px solid black;
+      padding: 10px;
+      width: 500px;
+      max-width: 100%;
+      min-height: 50px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Toxicity Analysis</h1>
+    <textarea id="textInput" rows="4" placeholder="Type your text here..."></textarea>
+    <button id="analyzeButton">Analyze Sentiment</button>
+    <div id="result">Sentiment Result</div>
+  </div>
+
+  <script>
+    let model;
+    const analyzeButton = document.getElementById('analyzeButton');
+    const textInput = document.getElementById('textInput');
+    const resultDiv = document.getElementById('result');
+
+    async function loadModel() {
+      model = await toxicity.load(0.9);
+    }
+
+    async function analyzeSentiment() {
+      const sentences = [textInput.value];
+      const predictions = await model.classify(sentences);
+      
+      const result = predictions.map(prediction => {
+        return `${prediction.label}: ${prediction.results[0].match ? 'Toxic' : 'Non-toxic'}`;
+      }).join('<br>');
+
+      resultDiv.innerHTML = result;
+    }
+
+    analyzeButton.addEventListener('click', analyzeSentiment);
+
+    async function main() {
+      await loadModel();
+    }
+
+    main();
+  </script>
+</body>
+</html>
