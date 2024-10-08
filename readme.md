@@ -30,6 +30,10 @@ This file implements object detection using the COCO-SSD model. It includes func
 ### [image2.html](image2.html)
 This file implements image captioning using Transformers.js. It includes an image upload input, a canvas to display the image, and a `div` to display the generated captions or errors.
 
+### [rag.html](rag.html)
+
+This files implements a RAG application using Transformers.js. It injests data and creates embeddings that become searchable. These are analyzed using an LLM, all in a browser.
+
 ### [sentiment1.html](sentiment1.html)
 This file implements sentiment analysis using Transformers.js. It includes a text area for input text, a button to analyze sentiment, and a `div` to display the output.
 
