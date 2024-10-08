@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browser RAG App</title>
+  <style>
+    .container {
+      padding: 10px;
+      width: 500px;
+      max-width: 100%;
+      min-height: 50px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    textarea, input {
+      padding: 10px;
+      font-size: 16px;
+      width: calc(100% - 22px);
+      margin-bottom: 20px;
+    }
+    pre {
+      background-color: #f4f4f4;
+      padding: 10px;
+      overflow-x: auto;
+    }
+  </style>
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@latest/dist/transformers.min.js';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Initialize the feature extraction pipeline with the specified model
+      const extractor = await pipeline('feature-extraction', 'mixedbread-ai/mxbai-embed-large-v1', {
+        quantized: false, // Comment out this line to use the quantized version
+      });
+
+      // Initialize the text generation pipeline with the specified model
+      const generator = await pipeline('text-generation', 'onnx-community/Llama-3.2-1B-Instruct-q4f16', {
+        device: 'webgpu', // Run on WebGPU
+      });
+
+      // Array to store the chunks and their embeddings
+      let storedChunks = [];
+
+      // Event listener for the "Generate Embeddings" button
+      document.getElementById('generate').addEventListener('click', async () => {
+        const text = document.getElementById('text-input').value; // Get the input text
+        const chunks = chunkText(text, 1024); // Chunk the text into smaller parts
+        const results = [];
+
+        // Generate embeddings for each chunk
+        for (const chunk of chunks) {
+          const output = await extractor(chunk, { pooling: 'mean', quantize: true, precision: 'binary' });
+          results.push({ chunk, embedding: output });
+        }
+
+        // Store the results and display them
+        storedChunks = results;
+        document.getElementById('output').textContent = JSON.stringify(results, null, 2);
+      });
+
+      // Event listener for the "Search" button
+      document.getElementById('search').addEventListener('click', async () => {
+        const query = document.getElementById('search-input').value; // Get the search query
+        const queryEmbedding = await extractor(query, { pooling: 'mean', quantize: true, precision: 'binary' }); // Generate embedding for the query
+        const similarities = storedChunks.map(({ chunk, embedding }) => ({
+          chunk,
+          similarity: cosineSimilarity(queryEmbedding, embedding) // Calculate cosine similarity
+        }));
+
+        // Sort the chunks by similarity and get the top 3
+        similarities.sort((a, b) => b.similarity - a.similarity);
+        const top3 = similarities.slice(0, 3);
+        document.getElementById('search-output').textContent = JSON.stringify(top3, null, 2);
+
+        // If there are similar chunks, generate a response using the most similar chunk
+        if (top3.length > 0) {
+          const mostSimilarChunk = top3[0].chunk;
+          const messages = [
+            { role: "system", content: "You are a research assistant. Answer the question: " + query },
+            { role: "user", content: mostSimilarChunk },
+          ];
+
+          const output = await generator(messages, { max_new_tokens: 128 });
+          document.getElementById('generated-output').textContent = output[0].generated_text[2].content;
+        }
+      });
+
+      // Function to chunk the text into smaller parts
+      function chunkText(text, size) {
+        const chunks = [];
+        for (let i = 0; i < text.length; i += size) {
+          chunks.push(text.slice(i, i + size));
+        }
+        return chunks;
+      }
+
+      // Function to calculate cosine similarity between two vectors
+      function cosineSimilarity(vecA, vecB) {
+        const dataA = Object.values(vecA.ort_tensor.cpuData);
+        const dataB = Object.values(vecB.ort_tensor.cpuData);
+
+        const dotProduct = dataA.reduce((sum, a, idx) => sum + a * dataB[idx], 0);
+        const magnitudeA = Math.sqrt(dataA.reduce((sum, a) => sum + a * a, 0));
+        const magnitudeB = Math.sqrt(dataB.reduce((sum, b) => sum + b * b, 0));
+
+        return dotProduct / (magnitudeA * magnitudeB);
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <textarea id="text-input" placeholder="Paste your corpus here"></textarea>
+    <button id="generate">Generate Embeddings</button>
+    <pre id="output"></pre>
+    <input type="text" id="search-input" placeholder="Enter search query">
+    <button id="search">Search</button>
+    <pre id="search-output"></pre>
+    <pre id="generated-output"></pre>
+  </div>
+</body>
+</html>
